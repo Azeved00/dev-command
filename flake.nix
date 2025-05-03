@@ -11,6 +11,7 @@
         system = "x86_64-linux";
         pkgs = import nixpkgs { inherit system; };
         package = import ./package.nix (pkgs);
+        ROOT = let p = builtins.getEnv "PWD"; in if p == "" then self else p;
     in
     {
 
@@ -28,15 +29,25 @@
                 };
 
                 config = mkIf cfg.enable {
-                    environment.systemPackages = [ 
+                    home.packages = [ 
                         package
                     ];
 
                 };
             };
 
+        devShells.${system}.default = pkgs.mkShell {
+            inherit ROOT;
+            name = "Dev";
 
-        
+            buildInputs = with pkgs; [
+                cargo rustc
+                rust-analyzer
+            ];
+
+            shellHook = ''
+            '';
+        };
     };
 }
 
