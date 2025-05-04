@@ -101,6 +101,12 @@ fn initiate_tmux(session: Session){
         .status()
         .ok();
 
+    for _ in 1..session.windows {
+        Command::new("tmux")
+            .args(["new-window"])
+            .status()
+            .ok();
+    }
 
     if session.attach {
         if env::var("TERM").unwrap_or_default() != "screen" || env::var("TMUX").is_err() {
