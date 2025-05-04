@@ -1,0 +1,11 @@
+[sessions.Dev]
+path="$HOME/Dev"
+title="Dev"
+attach=false
+[[sessions.thesis.windows]]
+title="Dev 1"
+nix_shell="dev"
+
+[[sessions.thesis.windows]]
+title="Run"
+
