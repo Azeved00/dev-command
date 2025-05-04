@@ -9,6 +9,7 @@ mod config;
 use config::{
     Session,
     Config,
+    default_windows,
 };
 
 const DEFAULT_CONFIG_PATH:&str = "$XDG_CONFIG_HOME/dev/config.toml";
@@ -60,38 +61,58 @@ fn initiate_tmux(session: Session){
         .expect("Failed to start tmux session");
 
 
-    if PathBuf::from("flake.nix").exists() &&session.nix_rename {
-        let rename_cmd = r#"tmux rename-session "$(nix --quiet develop --quiet -c bash -c 'env | awk -F= '\''{ if ($1 == "name") print $2 }'\'')" ; clear"#;
-        Command::new("tmux")
-            .args(["send-keys", "-t", &format!("{}:1.0", session.title), rename_cmd, "Enter"])
-            .status()
-            .ok();
-    }
 
-    Command::new("tmux")
-        .args(["send-keys", "-t", &format!("{}:1.0", session.title), &format!("nix develop --impure .#{}", session.nix_shell), "Enter"])
-        .status()
-        .ok();
 
-    for _ in 1..session.windows {
-        Command::new("tmux")
-            .args(["new-window"])
-            .status()
-            .ok();
-    }
-
-    if session.attach {
-        if env::var("TERM").unwrap_or_default() != "screen" || env::var("TMUX").is_err() {
+    for (idx, window) in session.windows.iter().enumerate() {
+        if idx != 0 {
             Command::new("tmux")
-                .args(["attach-session", "-t", &session.title])
-                .status()
-                .ok();
-        } else {
-            Command::new("tmux")
-                .args(["switch-client", "-t", &session.title])
+                .args([
+                    "new-window",
+                    "-t", &format!("{}:{}", session.title, idx+1)])
                 .status()
                 .ok();
         }
+
+        if window.title != "".to_string(){
+            Command::new("tmux")
+                .args([
+                    "rename-window",
+                    "-t", &format!("{}:{}", session.title, idx+1),
+                    &window.title
+                ])
+                .status()
+                .ok();
+        }
+        else if PathBuf::from("flake.nix").exists() {
+            if window.nix_rename {
+                let rename_cmd = r#"tmux rename-window "$(nix --quiet develop --quiet -c bash -c 'env | awk -F= '\''{ if ($1 == "name") print $2 }'\'')" ; clear"#;
+                Command::new("tmux")
+                    .args([
+                        "send-keys", 
+                        "-t", &format!("{}:{}", session.title, idx+1), rename_cmd, 
+                        "Enter"])
+                    .status()
+                    .ok();
+            }
+        }
+
+        if window.nix_shell != "".to_string() {
+            Command::new("tmux")
+                .args([
+                    "send-keys", 
+                    "-t", &format!("{}:{}", session.title, idx+1), 
+                    &format!("nix develop --impure .#{}", window.nix_shell), 
+                    "Enter"])
+                .status()
+                .ok();
+        }
+    }
+
+    if session.attach {
+        Command::new("tmux")
+            .args(["switch-client", "-t", &session.title])
+            .status()
+            .ok();
     }
 }
 
@@ -146,17 +167,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
 
             Session {
-                windows: 1,
+                windows: default_windows(),
                 title: cli.session_title,
                 attach: !cli.no_attach,
-                nix_rename: cli.nix_rename,
-                nix_shell: "default".to_string(),
                 path: "".to_string(),
             }
         }
     };
 
-    //println!("{:?}", s);
+    //println!("{:#?}", s);
 
     initiate_tmux(s);
     Ok(())
