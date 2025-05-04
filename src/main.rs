@@ -4,35 +4,14 @@ use std::{
     path::PathBuf,
     process::Command,
 };
-use serde::Deserialize;
-use std::collections::HashMap;
+
+mod config;
+use config::{
+    Session,
+    Config,
+};
 
 const DEFAULT_CONFIG_PATH:&str = "$XDG_CONFIG_HOME/dev/config.toml";
-
-#[derive(Deserialize, Clone, Debug)]
-struct Session{
-    #[serde(default = "default_num_windows")]
-    windows: i64,
-    #[serde(default = "default_nix_shell")]
-    nix_shell: String,
-    path: String,
-    #[serde(default = "default_title")]
-    title: String,
-    #[serde(default = "default_attach")]
-    attach: bool,
-    #[serde(default = "default_nix_rename")]
-    nix_rename: bool,
-}
-fn default_num_windows() -> i64{ 1 }
-fn default_nix_shell() -> String { "default".to_string() }
-fn default_title() -> String { "".to_string() }
-fn default_attach() -> bool { true }
-fn default_nix_rename() -> bool { false }
-
-#[derive(Deserialize)]
-struct Config{
-    sessions: HashMap<String, Session>,
-}
 
 
 #[derive(Parser)]
@@ -73,13 +52,6 @@ fn expand_env_vars(path: &str) -> PathBuf {
     PathBuf::from(expanded.as_ref())
 }
 
-fn get_config(path:PathBuf) -> Result<Config, Box<dyn std::error::Error>> {
-    let b = path.to_string_lossy();
-    let expanded = shellexpand::full(&b).unwrap();
-    let content = fs::read_to_string(expanded.as_ref())?; 
-    let config: Config = toml::from_str(&content)?;
-    Ok(config)
-}
 
 fn initiate_tmux(session: Session){
     Command::new("tmux")
@@ -125,7 +97,10 @@ fn initiate_tmux(session: Session){
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut cli = Cli::parse();
-    let mut config = get_config(cli.config.clone())?;
+
+    let b = cli.config.to_string_lossy();
+    let expanded = shellexpand::full(&b).unwrap();
+    let mut config = Config::get_config(PathBuf::from(expanded.as_ref()))?;
 
 
     let s = match cli.session_name {
