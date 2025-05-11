@@ -55,29 +55,30 @@ fn expand_env_vars(path: &str) -> PathBuf {
 
 
 fn initiate_tmux(session: Session){
+    println!("Starting tmux session (detached)");
     Command::new("tmux")
         .args(["new-session", "-d", "-s", &session.title])
-        .spawn()
-        .expect("Failed to start tmux session");
-
-
-
+        .status()
+        .ok();
 
     for (idx, window) in session.windows.iter().enumerate() {
-        if idx != 0 {
+        let window_idx=idx+1;
+        if window_idx != 1 {
+            println!("Creating window {}:{}", session.title, window_idx);
             Command::new("tmux")
                 .args([
                     "new-window",
-                    "-t", &format!("{}:{}", session.title, idx+1)])
+                    "-t", &format!("{}:{}", session.title, window_idx)])
                 .status()
                 .ok();
         }
 
         if window.title != "".to_string(){
+            println!("Setting window title");
             Command::new("tmux")
                 .args([
                     "rename-window",
-                    "-t", &format!("{}:{}", session.title, idx+1),
+                    "-t", &format!("{}:{}", session.title, window_idx),
                     &window.title
                 ])
                 .status()
@@ -85,6 +86,7 @@ fn initiate_tmux(session: Session){
         }
         else if PathBuf::from("flake.nix").exists() {
             if window.nix_rename {
+                println!("Using nix to rename the window");
                 let rename_cmd = r#"tmux rename-window "$(nix --quiet develop --quiet -c bash -c 'env | awk -F= '\''{ if ($1 == "name") print $2 }'\'')" ; clear"#;
                 Command::new("tmux")
                     .args([
@@ -97,6 +99,7 @@ fn initiate_tmux(session: Session){
         }
 
         if window.nix_shell != "".to_string() {
+            println!("Starting nix shell");
             Command::new("tmux")
                 .args([
                     "send-keys", 
@@ -109,10 +112,19 @@ fn initiate_tmux(session: Session){
     }
 
     if session.attach {
-        Command::new("tmux")
-            .args(["switch-client", "-t", &session.title])
-            .status()
-            .ok();
+        if env::var("TMUX").is_ok() {
+            println!("Already inside tmux, changig client");
+            Command::new("tmux")
+                .args(["switch-client", "-t", &session.title])
+                .status()
+                .ok();
+        } else {
+            println!("Attaching to session");
+            Command::new("tmux")
+                .args(["attach-session", "-t", &session.title])
+                .status()
+                .ok();
+        }
     }
 }
 
