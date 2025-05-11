@@ -46,6 +46,10 @@ struct Cli {
     /// Give a custom config
     #[arg(short = 'c', long="config", default_value=DEFAULT_CONFIG_PATH)]
     config: PathBuf,
+
+    /// Increase output verbosity
+    #[arg(short, long, action = clap::ArgAction::Count)]
+    verbose: u8,
 }
 
 fn expand_env_vars(path: &str) -> PathBuf {
@@ -54,8 +58,10 @@ fn expand_env_vars(path: &str) -> PathBuf {
 }
 
 
-fn initiate_tmux(session: Session){
-    println!("Starting tmux session (detached)");
+fn initiate_tmux(session: Session, cli: Cli){
+    if cli.verbose == 1 {
+        println!("Starting tmux session (detached)");
+    }
     Command::new("tmux")
         .args(["new-session", "-d", "-s", &session.title])
         .status()
@@ -64,7 +70,9 @@ fn initiate_tmux(session: Session){
     for (idx, window) in session.windows.iter().enumerate() {
         let window_idx=idx+1;
         if window_idx != 1 {
-            println!("Creating window {}:{}", session.title, window_idx);
+            if cli.verbose == 1 {
+                println!("Creating window {}:{}", session.title, window_idx);
+            }
             Command::new("tmux")
                 .args([
                     "new-window",
@@ -74,7 +82,9 @@ fn initiate_tmux(session: Session){
         }
 
         if window.title != "".to_string(){
-            println!("Setting window title");
+            if cli.verbose == 1 {
+                println!("Setting window title");
+            }
             Command::new("tmux")
                 .args([
                     "rename-window",
@@ -86,7 +96,9 @@ fn initiate_tmux(session: Session){
         }
         else if PathBuf::from("flake.nix").exists() {
             if window.nix_rename {
-                println!("Using nix to rename the window");
+                if cli.verbose == 1 {
+                    println!("Using nix to rename the window");
+                }
                 let rename_cmd = r#"tmux rename-window "$(nix --quiet develop --quiet -c bash -c 'env | awk -F= '\''{ if ($1 == "name") print $2 }'\'')" ; clear"#;
                 Command::new("tmux")
                     .args([
@@ -99,7 +111,9 @@ fn initiate_tmux(session: Session){
         }
 
         if window.nix_shell != "".to_string() {
-            println!("Starting nix shell");
+            if cli.verbose == 1 {
+                println!("Starting nix shell");
+            }
             Command::new("tmux")
                 .args([
                     "send-keys", 
@@ -113,13 +127,17 @@ fn initiate_tmux(session: Session){
 
     if session.attach {
         if env::var("TMUX").is_ok() {
-            println!("Already inside tmux, changig client");
+            if cli.verbose == 1 {
+                println!("Already inside tmux, changig client");
+            }
             Command::new("tmux")
                 .args(["switch-client", "-t", &session.title])
                 .status()
                 .ok();
         } else {
-            println!("Attaching to session");
+            if cli.verbose == 1 {
+                println!("Attaching to session");
+            }
             Command::new("tmux")
                 .args(["attach-session", "-t", &session.title])
                 .status()
@@ -136,7 +154,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut config = Config::get_config(PathBuf::from(expanded.as_ref()))?;
 
 
-    let s = match cli.session_name {
+    let s = match cli.session_name.clone() {
         Some(name) => {
             let s = config.sessions.get_mut(&name).unwrap_or_else(|| {
                 eprintln!("No session with that name in the config file");
@@ -180,8 +198,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             Session {
                 windows: default_windows(),
-                title: cli.session_title,
-                attach: !cli.no_attach,
+                title: cli.session_title.clone(),
+                attach: !cli.no_attach.clone(),
                 path: "".to_string(),
             }
         }
@@ -189,6 +207,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     //println!("{:#?}", s);
 
-    initiate_tmux(s);
+    initiate_tmux(s, cli);
     Ok(())
 }
