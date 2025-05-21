@@ -114,14 +114,40 @@ fn initiate_tmux(session: Session, cli: Cli){
             if cli.verbose == 1 {
                 println!("Starting nix shell");
             }
-            Command::new("tmux")
-                .args([
-                    "send-keys", 
-                    "-t", &format!("{}:{}", session.title, idx+1), 
-                    &format!("nix develop --impure .#{}", window.nix_shell), 
-                    "Enter"])
-                .status()
-                .ok();
+
+            if PathBuf::from("flake.nix").exists() {
+                Command::new("tmux")
+                    .args([
+                        "send-keys", 
+                        "-t", &format!("{}:{}", session.title, idx+1), 
+                        &format!("nix develop --impure .#{}", window.nix_shell), 
+                        "Enter"])
+                    .status()
+                    .ok();
+            } 
+            else if PathBuf::from("shell.nix").exists() {
+                Command::new("tmux")
+                    .args([
+                        "send-keys", 
+                        "-t", &format!("{}:{}", session.title, idx+1), 
+                        &format!("nix-shell --impure"), 
+                        "Enter"])
+                    .status()
+                    .ok();
+            }
+            else if PathBuf::from("default.nix").exists() {
+                Command::new("tmux")
+                    .args([
+                        "send-keys", 
+                        "-t", &format!("{}:{}", session.title, idx+1), 
+                        &format!("nix-shell --impure"), 
+                        "Enter"])
+                    .status()
+                    .ok();
+            }
+            else {
+                eprintln!("No nix shell file detected");
+            }
         }
     }
 
