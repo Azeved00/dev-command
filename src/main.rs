@@ -125,7 +125,7 @@ fn initiate_tmux(session: Session, cli: Cli){
         }
     }
 
-    if session.attach {
+    if cli.no_attach {
         if env::var("TMUX").is_ok() {
             if cli.verbose == 1 {
                 println!("Already inside tmux, changig client");
