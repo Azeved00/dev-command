@@ -17,24 +17,7 @@
 
         packages.${system}.default = package;
 
-        homeManagerModules.default = {lib, config, pkgs, ...}: with lib;
-            let
-                cfg = config.dev-command;
-            in
-            {
-                imports = [ ];
-
-                options.dev-command = {
-                    enable = mkEnableOption "Enable Dev command";
-                };
-
-                config = mkIf cfg.enable {
-                    home.packages = [ 
-                        package
-                    ];
-
-                };
-            };
+        homeManagerModules.default = import ./module.nix;
 
         devShells.${system}.default = pkgs.mkShell {
             inherit ROOT;
