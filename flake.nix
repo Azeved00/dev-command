@@ -10,14 +10,14 @@
     let 
         system = "x86_64-linux";
         pkgs = import nixpkgs { inherit system; };
-        package = import ./package.nix (pkgs);
+        package = import ./nix/package.nix (pkgs);
         ROOT = let p = builtins.getEnv "PWD"; in if p == "" then self else p;
     in
     {
 
         packages.${system}.default = package;
 
-        homeManagerModules.default = import ./module.nix;
+        homeManagerModules.default = import ./nix/module.nix;
 
         devShells.${system}.default = pkgs.mkShell {
             inherit ROOT;
