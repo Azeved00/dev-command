@@ -26,10 +26,34 @@ fn initiate_tmux(session: Session, cli: Cli){
     if cli.verbose == 1 {
         println!("Starting tmux session (detached)");
     }
-    Command::new("tmux")
+    let x = Command::new("tmux")
         .args(["new-session", "-d", "-s", &session.title])
-        .status()
-        .ok();
+        .status().expect("failed to create new session");
+
+    if !x.success(){
+        println!("Session '{}' already exists or failed to create.", session.title);
+
+        if !cli.no_attach {
+            if env::var("TMUX").is_ok() {
+                if cli.verbose == 1 {
+                    println!("Already inside tmux, changig client");
+                }
+                Command::new("tmux")
+                    .args(["switch-client", "-t", &session.title])
+                    .status()
+                    .ok();
+            } else {
+                if cli.verbose == 1 {
+                    println!("Attaching to session");
+                }
+                Command::new("tmux")
+                    .args(["attach-session", "-t", &session.title])
+                    .status()
+                    .ok();
+            }
+        }
+        return ;
+    }
 
     for (idx, window) in session.windows.iter().enumerate() {
         let window_idx=idx+1;
@@ -190,6 +214,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 windows: default_windows(),
                 title: cli.session_title.clone(),
                 path: "".to_string(),
+                git: false,
             }
         }
     };
