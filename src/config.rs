@@ -29,6 +29,9 @@ pub struct Session{
 
     #[serde(default = "default_git")]
     pub git: bool,
+
+    #[serde(default = "default_attach")]
+    pub attach: bool,
 }
 
 #[derive(Deserialize)]
@@ -56,5 +59,6 @@ pub fn default_windows() -> Vec<Window> {
 }
 fn default_title() -> String { "".to_string() }
 fn default_nix_rename() -> bool { false }
+fn default_attach() -> bool { true }
 fn default_nix_shell_name() -> String { "".to_string() }
 fn default_git() -> bool {false}
