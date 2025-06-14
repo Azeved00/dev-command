@@ -145,7 +145,7 @@ fn initiate_tmux(session: Session, cli: Cli){
                 println!("Already inside tmux, changig client");
             }
             Command::new("tmux")
-                .args(["switch-client", "-t", &format!("{}:0", session.title)])
+                .args(["switch-client", "-t", &format!("{}:1", session.title)])
                 .status()
                 .ok();
         } else {
@@ -153,7 +153,7 @@ fn initiate_tmux(session: Session, cli: Cli){
                 println!("Attaching to session");
             }
             Command::new("tmux")
-                .args(["attach-session", "-t",&format!("{}:0", session.title)])
+                .args(["attach-session", "-t",&format!("{}:1", session.title)])
                 .status()
                 .ok();
         }
