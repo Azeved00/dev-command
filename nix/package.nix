@@ -2,7 +2,7 @@
 
 pkgs.rustPlatform.buildRustPackage {
     pname = "dev";
-    version = "1.0.0";
+    version = "1.0.1";
     cargoLock.lockFile = ../Cargo.lock;
     src = pkgs.lib.cleanSource ../.;
 

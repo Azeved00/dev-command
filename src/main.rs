@@ -196,6 +196,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     .to_string();
             }
 
+            s.attach = !session.no_attach;
             s.clone()
         }
 
