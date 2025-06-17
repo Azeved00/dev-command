@@ -12,6 +12,7 @@ use config::{
     Session,
     Config,
     default_windows,
+    Window,
 };
 
 
@@ -21,124 +22,90 @@ fn expand_env_vars(path: &str) -> PathBuf {
     PathBuf::from(expanded.as_ref())
 }
 
-
-fn initiate_tmux(session: Session, cli: Cli){
-    if cli.verbose >= 1 {
-        println!("Starting tmux session (detached)");
-    }
-    let x = Command::new("tmux")
-        .args(["new-session", "-d", "-s", &session.title])
-        .status().expect("failed to create new session");
-
-    if !x.success(){
-        println!("Session '{}' already exists or failed to create.", session.title);
-
-        if session.attach {
-            if env::var("TMUX").is_ok() {
-                if cli.verbose >= 1 {
-                    println!("Already inside tmux, changig client");
-                }
-                Command::new("tmux")
-                    .args(["switch-client", "-t", &session.title])
-                    .status()
-                    .ok();
-            } else {
-                if cli.verbose == 1 {
-                    println!("Attaching to session");
-                }
-                Command::new("tmux")
-                    .args(["attach-session", "-t", &session.title])
-                    .status()
-                    .ok();
-            }
+fn create_window(index: usize, window: &Window, session: &Session, cli: &Cli){
+    if index != 1 {
+        if cli.verbose >= 1 {
+            println!("Creating window {}:{}", session.title, index);
         }
-        return ;
+        Command::new("tmux")
+            .args([
+                "new-window",
+                "-t", &format!("{}:{}", session.title, index)])
+            .status()
+            .ok();
     }
 
-    for (idx, window) in session.windows.iter().enumerate() {
-        let window_idx=idx+1;
-        if window_idx != 1 {
+    if window.title != "".to_string(){
+        if cli.verbose >= 1 {
+            println!("Setting window title");
+        }
+        Command::new("tmux")
+            .args([
+                "rename-window",
+                "-t", &format!("{}:{}", session.title, index),
+                &window.title
+            ])
+            .status()
+            .ok();
+    }
+    else if PathBuf::from("flake.nix").exists() {
+        if window.nix_rename {
             if cli.verbose >= 1 {
-                println!("Creating window {}:{}", session.title, window_idx);
+                println!("Using nix to rename the window");
             }
+            let rename_cmd = r#"tmux rename-window "$(nix --quiet develop --quiet -c bash -c 'env | awk -F= '\''{ if ($1 == "name") print $2 }'\'')" ; clear"#;
             Command::new("tmux")
                 .args([
-                    "new-window",
-                    "-t", &format!("{}:{}", session.title, window_idx)])
+                    "send-keys", 
+                    "-t", &format!("{}:{}", session.title, index), rename_cmd, 
+                    "Enter"])
                 .status()
                 .ok();
         }
+    }
 
-        if window.title != "".to_string(){
-            if cli.verbose >= 1 {
-                println!("Setting window title");
-            }
+    if window.nix_shell != "".to_string() {
+        if cli.verbose >= 1 {
+            println!("Starting nix shell");
+        }
+
+        if PathBuf::from("flake.nix").exists() {
             Command::new("tmux")
                 .args([
-                    "rename-window",
-                    "-t", &format!("{}:{}", session.title, window_idx),
-                    &window.title
-                ])
+                    "send-keys", 
+                    "-t", &format!("{}:{}", session.title, index), 
+                    &format!("nix develop --impure .#{}", window.nix_shell), 
+                    "Enter"])
+                .status()
+                .ok();
+        } 
+        else if PathBuf::from("shell.nix").exists() {
+            Command::new("tmux")
+                .args([
+                    "send-keys", 
+                    "-t", &format!("{}:{}", session.title, index), 
+                    &format!("nix-shell --impure"), 
+                    "Enter"])
                 .status()
                 .ok();
         }
-        else if PathBuf::from("flake.nix").exists() {
-            if window.nix_rename {
-                if cli.verbose >= 1 {
-                    println!("Using nix to rename the window");
-                }
-                let rename_cmd = r#"tmux rename-window "$(nix --quiet develop --quiet -c bash -c 'env | awk -F= '\''{ if ($1 == "name") print $2 }'\'')" ; clear"#;
-                Command::new("tmux")
-                    .args([
-                        "send-keys", 
-                        "-t", &format!("{}:{}", session.title, idx+1), rename_cmd, 
-                        "Enter"])
-                    .status()
-                    .ok();
-            }
+        else if PathBuf::from("default.nix").exists() {
+            Command::new("tmux")
+                .args([
+                    "send-keys", 
+                    "-t", &format!("{}:{}", session.title, index), 
+                    &format!("nix-shell --impure"), 
+                    "Enter"])
+                .status()
+                .ok();
         }
-
-        if window.nix_shell != "".to_string() {
-            if cli.verbose >= 1 {
-                println!("Starting nix shell");
-            }
-
-            if PathBuf::from("flake.nix").exists() {
-                Command::new("tmux")
-                    .args([
-                        "send-keys", 
-                        "-t", &format!("{}:{}", session.title, idx+1), 
-                        &format!("nix develop --impure .#{}", window.nix_shell), 
-                        "Enter"])
-                    .status()
-                    .ok();
-            } 
-            else if PathBuf::from("shell.nix").exists() {
-                Command::new("tmux")
-                    .args([
-                        "send-keys", 
-                        "-t", &format!("{}:{}", session.title, idx+1), 
-                        &format!("nix-shell --impure"), 
-                        "Enter"])
-                    .status()
-                    .ok();
-            }
-            else if PathBuf::from("default.nix").exists() {
-                Command::new("tmux")
-                    .args([
-                        "send-keys", 
-                        "-t", &format!("{}:{}", session.title, idx+1), 
-                        &format!("nix-shell --impure"), 
-                        "Enter"])
-                    .status()
-                    .ok();
-            }
-            else {
-                eprintln!("No nix shell file detected");
-            }
+        else {
+            eprintln!("No nix shell file detected");
         }
     }
+}
 
+fn attach_session(session: &Session, cli:&Cli){
     if session.attach {
         if env::var("TMUX").is_ok() {
             if cli.verbose >= 1 {
@@ -158,6 +125,40 @@ fn initiate_tmux(session: Session, cli: Cli){
                 .ok();
         }
     }
+}
+
+
+fn initiate_tmux(session: Session, cli: Cli){
+    if session.git{
+        if cli.verbose >= 1 {
+            println!("Fetching updates from git remote");
+        }
+
+        Command::new("git")
+            .args(["fetch", "--all", "--prune"])
+            .status()
+            .ok();
+    }
+
+    if cli.verbose >= 1 {
+        println!("Starting tmux session (detached)");
+    }
+
+    let x = Command::new("tmux")
+        .args(["new-session", "-d", "-s", &session.title])
+        .status().expect("failed to create new session");
+
+    if !x.success(){
+        println!("Session '{}' already exists or failed to create.", session.title);
+        attach_session(&session, &cli);
+        return ;
+    }
+
+    for (idx, window) in session.windows.iter().enumerate() {
+        create_window(idx+1, &window, &session, &cli);
+    }
+
+    attach_session(&session, &cli);
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
