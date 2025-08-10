@@ -9,7 +9,7 @@ pkgs.rustPlatform.buildRustPackage {
 
     #install bash completion
     postInstall = ''
-        #install -Dm644 target/release/build/my-rust-app/out/my-rust-app.bash \
-        #    $out/share/bash-completion/completions/my-rust-app
+        mkdir -p $out/share/bash-completion/completions
+        cp extra/dev.bash $out/share/bash-completion/completions/
     '';
 }
