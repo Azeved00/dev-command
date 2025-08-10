@@ -10,6 +10,6 @@ pkgs.rustPlatform.buildRustPackage {
     #install bash completion
     postInstall = ''
         mkdir -p $out/share/bash-completion/completions
-        cp extra/dev.bash $out/share/bash-completion/completions/
+        cp extra/dev.bash $out/share/bash-completion/completions/dev
     '';
 }
