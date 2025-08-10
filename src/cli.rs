@@ -24,13 +24,14 @@ pub struct Cli {
 
 #[derive(Debug, Subcommand)]
 pub enum Commands {
-    /// Create a new tmux session from a directory
+    #[command(alias = "n")] 
     New(NewSession),
 
-    /// Load a session from a predefined config
+    #[command(alias = "l", alias = "ld")] 
     Load(LoadSession),
 }
 
+/// Create a new tmux session from a directory
 #[derive(Debug, Args)]
 pub struct NewSession {
     /// Title of the session (if empty, basename of directory is used)
@@ -53,6 +54,7 @@ pub struct NewSession {
     pub nix_rename: bool,
 }
 
+/// Load a session from a predefined config
 #[derive(Debug, Args)]
 pub struct LoadSession {
     /// Name of the session from config
