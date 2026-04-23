@@ -21,21 +21,15 @@ fn expand_env_vars(path: &str) -> PathBuf {
     let expanded = shellexpand::full(path).unwrap();
     PathBuf::from(expanded.as_ref())
 }
+fn tmux(args: &[&str]) {
+    Command::new("tmux")
+        .args(args)
+        .status()
+        .ok();
+}
 
-fn create_window(index: usize, window: &Window, session: &Session, cli: &Cli){
-    if index != 1 {
-        if cli.verbose >= 1 {
-            println!("Creating window {}:{}", session.title, index);
-        }
-        Command::new("tmux")
-            .args([
-                "new-window",
-                "-t", &format!("{}:{}", session.title, index)])
-            .status()
-            .ok();
-    }
-
-    if window.title != "".to_string(){
+fn rename_window(index: usize, window: &Window, session: &Session, cli: &Cli){
+    if !window.title.is_empty(){
         if cli.verbose >= 1 {
             println!("Setting window title");
         }
@@ -63,46 +57,97 @@ fn create_window(index: usize, window: &Window, session: &Session, cli: &Cli){
                 .ok();
         }
     }
+}
+fn setup_panes(index: usize, window: &Window, session: &Session, cli: &Cli) {
+    let target = format!("{}:{}", session.title, index);
 
-    if window.nix_shell != "".to_string() {
+    for i in 1..window.pane_count {
         if cli.verbose >= 1 {
-            println!("Starting nix shell");
+            println!("Creating pane {} in window {}", i, target);
         }
 
-        if PathBuf::from("flake.nix").exists() {
-            Command::new("tmux")
-                .args([
-                    "send-keys", 
-                    "-t", &format!("{}:{}", session.title, index), 
-                    &format!("nix develop --impure .#{}", window.nix_shell), 
-                    "Enter"])
-                .status()
-                .ok();
-        } 
-        else if PathBuf::from("shell.nix").exists() {
-            Command::new("tmux")
-                .args([
-                    "send-keys", 
-                    "-t", &format!("{}:{}", session.title, index), 
-                    &format!("nix-shell --impure"), 
-                    "Enter"])
-                .status()
-                .ok();
-        }
-        else if PathBuf::from("default.nix").exists() {
-            Command::new("tmux")
-                .args([
-                    "send-keys", 
-                    "-t", &format!("{}:{}", session.title, index), 
-                    &format!("nix-shell --impure"), 
-                    "Enter"])
-                .status()
-                .ok();
-        }
-        else {
-            eprintln!("No nix shell file detected");
-        }
+        tmux(&["split-window", "-t", &target]);
     }
+
+
+    if cli.verbose >= 1 {
+        println!("Applying layout: {}", window.pane_layout);
+    }
+
+    tmux(&[
+        "select-layout",
+        "-t",
+        &target,
+        &window.pane_layout,
+    ]);
+}
+
+fn start_nix_shells(index: usize, window: &Window, session: &Session, cli: &Cli){
+    if window.nix_shell.is_empty() {
+        return;
+    }
+
+    if cli.verbose >= 1 {
+        println!("Starting nix shell in all panes");
+    }
+
+    let target = format!("{}:{}", session.title, index);
+
+    // Decide nix command once
+    let nix_cmd = if PathBuf::from("flake.nix").exists() {
+        format!("nix develop --impure .#{}", window.nix_shell)
+    } else if PathBuf::from("shell.nix").exists() 
+        || PathBuf::from("default.nix").exists() 
+    {
+        "nix-shell --impure".to_string()
+    } else {
+        eprintln!("No nix shell file detected");
+        return;
+    };
+
+    // Get all pane IDs in this window
+    let output = Command::new("tmux")
+        .args(["list-panes", "-t", &target, "-F", "#{pane_id}"])
+        .output()
+        .expect("failed to list panes");
+
+    let panes = String::from_utf8_lossy(&output.stdout);
+
+    // Send nix command to each pane
+    for pane in panes.lines() {
+        if cli.verbose >= 1 {
+            println!("Starting nix shell in pane {}", pane);
+        }
+
+        Command::new("tmux")
+            .args([
+                "send-keys",
+                "-t",
+                pane,
+                &nix_cmd,
+                "Enter",
+            ])
+            .status()
+            .ok();
+    }
+}
+
+fn create_window(index: usize, window: &Window, session: &Session, cli: &Cli){
+    if index != 1 {
+        if cli.verbose >= 1 {
+            println!("Creating window {}:{}", session.title, index);
+        }
+        Command::new("tmux")
+            .args([
+                "new-window",
+                "-t", &format!("{}:{}", session.title, index)])
+            .status()
+            .ok();
+    }
+
+    rename_window(index, window, session, cli);
+    setup_panes(index, window, session, cli);
+    start_nix_shells(index, window, session, cli);
 }
 
 fn attach_session(session: &Session, cli:&Cli){
