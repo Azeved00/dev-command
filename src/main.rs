@@ -66,7 +66,9 @@ fn setup_panes(index: usize, window: &Window, session: &Session, cli: &Cli) {
             println!("Creating pane {} in window {}", i, target);
         }
 
-        tmux(&["split-window", "-t", &target]);
+        let split_flag = if i % 2 == 0 { "-h" } else { "-v" };
+
+        tmux(&["split-window", "-p 75", split_flag, "-t", &target]);
     }
 
 
