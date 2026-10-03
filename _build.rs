@@ -4,7 +4,8 @@ use std::io::Error;
 use clap_complete::{generate_to, shells::Bash};
 use clap::CommandFactory;
 
-include!("src/cli.rs");
+//include!("src/config.rs");
+//include!("src/commands/mod.rs");
 
 fn main() -> Result<(), Error> {
     let outdir = match env::var_os("OUT_DIR") {

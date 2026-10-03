@@ -18,6 +18,7 @@ use crate::commands::{
     Commands,
     start::start_session,
     load::load_session,
+    init::init_project,
 };
 
 
@@ -182,6 +183,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let s = match cli.command {
         Commands::Start(ref session) => start_session(config, session),
         Commands::Load(ref session) => load_session(config, session),
+        Commands::Init(ref session) => init_project(config, session),
     };
     if cli.verbose >= 2 {
         println!("{:#?}", s);
