@@ -48,12 +48,19 @@ pub struct InitProject {
 pub fn init_project (config: Config, command: &InitProject) ->  Session
 {
     fs::create_dir_all(command.directory.clone())
-        .unwrap_or_else(|_| {
+        .unwrap_or_else(|err| {
+            eprintln!("{}",err);
             eprintln!("Failed to create project directory");
             std::process::exit(1);
     });
 
-    copy_template(&command.template, &command.directory)
+    let target = if command.directory.is_absolute() {
+        command.directory.clone()
+    } else {
+        std::env::current_dir().unwrap().join(&command.directory)
+    };
+
+    copy_template(&command.template, &target)
         .unwrap_or_else(|err| {
             eprintln!("{}",err);
             eprintln!("Failed to instantiate the template");
@@ -71,19 +78,42 @@ pub fn init_project (config: Config, command: &InitProject) ->  Session
     start_session(config, &start_command)
 }
 
+
 fn copy_template(template_name: &str, target: &Path) -> io::Result<()> {
     let template_dir = TEMPLATES_DIR
-        .get_dir(template_name)
+        .get_dir(template_name.trim())
         .ok_or_else(|| {
             io::Error::new(
                 io::ErrorKind::NotFound,
-                format!("template not found: {template_name}"),
+                format!("template not found: {template_name:?}"),
             )
         })?;
 
-    template_dir.extract(target).map_err(|error| {
-        io::Error::other(format!(
-            "failed to extract template {template_name}: {error}"
-        ))
-    })
+    for file in template_dir.files() {
+        let relative_path = file
+            .path()
+            .strip_prefix(template_dir.path())
+            .map_err(io::Error::other)?;
+
+        let output_path = target.join(relative_path);
+
+        println!(
+            "extracting {} -> {}",
+            file.path().display(),
+            output_path.display()
+        );
+
+        if let Some(parent) = output_path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+
+        fs::write(&output_path, file.contents()).map_err(|error| {
+            io::Error::new(
+                error.kind(),
+                format!("failed to write {}: {error}", output_path.display()),
+            )
+        })?;
+    }
+
+    Ok(())
 }
