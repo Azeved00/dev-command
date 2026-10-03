@@ -1,16 +1,18 @@
 use clap::Args;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use std::io;
 use std::fs;
 use std::env;
 
 use crate::config::{
     Session,
     Config,
-    default_windows,
 };
 use crate::commands::start::{
     StartSession, start_session,
 };
+
+const DEFAULT_TEMPLATE: &str = "default";
 
 /// Create a new tmux session from a directory
 #[derive(Debug, Args)]
@@ -18,8 +20,13 @@ pub struct InitProject {
     /// Directory to create the project on 
     pub directory: PathBuf,
 
+    /// The template to use
+    /// if no template is provided then the default is used
+    #[arg(short = 't', default_value = DEFAULT_TEMPLATE)]
+    pub template: String,
+
     /// Title of the session (if empty, basename of directory is used)
-    #[arg(short = 't')]
+    #[arg()]
     pub title: Option<String>,
 
     /// Do not attach to the tmux server
@@ -42,12 +49,14 @@ pub fn init_project (config: Config, command: &InitProject) ->  Session
             eprintln!("Failed to create project directory");
             std::process::exit(1);
     });
-    let mut readme = command.directory.clone();
-    readme.push("readme.md");
 
-    fs::write(readme, "Application started\n")
+    let source = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("templates/")
+        .join(command.template.clone());
+
+    copy_dir_contents(&source, &command.directory)
         .unwrap_or_else(|_| {
-            eprintln!("Failed to create readme");
+            eprintln!("Failed to create project directory");
             std::process::exit(1);
     });
 
@@ -60,4 +69,22 @@ pub fn init_project (config: Config, command: &InitProject) ->  Session
 
     };
     start_session(config, &start_command)
+}
+
+fn copy_dir_contents(src: &Path, target: &Path) -> io::Result<()> {
+    fs::create_dir_all(target)?;
+
+    for entry in fs::read_dir(src)? {
+        let entry = entry?;
+        let source_path = entry.path();
+        let target_path = target.join(entry.file_name());
+
+        if source_path.is_dir() {
+            copy_dir_contents(&source_path, &target_path)?;
+        } else {
+            fs::copy(&source_path, &target_path)?;
+        }
+    }
+
+    Ok(())
 }
