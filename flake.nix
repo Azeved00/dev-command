@@ -17,6 +17,21 @@
 
         packages.${system}.default = package;
 
+        templates = rec {
+            latex = {
+                path = ./templates/latex/.;
+                description = "A general template for latex writting";
+                welcomeText = ''
+                    Latex template Loaded.
+
+                    Run `nix develop` to enter the development shell, or
+                    use the apps `build` and `watch` to directly build the document,
+                    or rebuild on file changes
+                '';
+            };
+            default = latex;
+        };
+
         homeManagerModules.default = import ./nix/module.nix;
 
         devShells.${system}.default = pkgs.mkShell {

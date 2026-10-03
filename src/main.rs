@@ -1,23 +1,28 @@
+pub mod commands;
+pub mod config;
+
 use std::{
-    env, fs,
+    env,
     path::PathBuf,
     process::Command,
 };
-mod cli;
-use cli::Cli;
 use clap::Parser;
 
-mod config;
-use config::{
+use crate::config::{
     Session,
     Config,
-    default_windows,
     Window,
+};
+use crate::commands::{
+    Cli,
+    Commands,
+    start::start_session,
+    load::load_session,
 };
 
 
 
-fn expand_env_vars(path: &str) -> PathBuf {
+pub fn expand_env_vars(path: &str) -> PathBuf {
     let expanded = shellexpand::full(path).unwrap();
     PathBuf::from(expanded.as_ref())
 }
@@ -169,64 +174,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let b = cli.config.to_string_lossy();
     let expanded = shellexpand::full(&b).unwrap();
-    let mut config = Config::get_config(PathBuf::from(expanded.as_ref()))?;
+    let config = Config::get_config(PathBuf::from(expanded.as_ref()))?;
 
     if cli.verbose >= 1 {
         println!("Generating session object");
     }
     let s = match cli.command {
-        cli::Commands::Load(ref session) => {
-            let s = config.sessions.get_mut(&session.name).unwrap_or_else(|| {
-                eprintln!("No session with that name in the config file");
-                std::process::exit(1);
-            });
-
-            let path = expand_env_vars(&s.path);
-            let directory = fs::canonicalize(path).unwrap_or_else(|_| {
-                eprintln!("Invalid directory");
-                std::process::exit(1);
-            });
-
-            env::set_current_dir(&directory).expect("Failed to change directory");
-
-            if s.title == "" {
-                s.title = directory
-                    .file_name()
-                    .unwrap_or_default()
-                    .to_string_lossy()
-                    .to_string();
-            }
-
-            s.attach = !session.no_attach;
-            s.clone()
-        }
-
-        cli::Commands::New(ref session) => {
-            let directory = fs::canonicalize(session.directory.clone())
-                .unwrap_or_else(|_| {
-                    eprintln!("Invalid directory");
-                    std::process::exit(1);
-            });
-
-            env::set_current_dir(&directory).expect("Failed to change directory");
-
-            let title = match session.title.clone() {
-                Some(name) => name.clone(),
-                None=> directory
-                        .file_name()
-                        .unwrap_or_default()
-                        .to_string_lossy()
-                        .to_string() 
-            };
-
-            Session {
-                windows: default_windows(),
-                title,
-                path: "".to_string(),
-                git: false,
-                attach: !session.no_attach,
-            }
-        }
+        Commands::Start(ref session) => start_session(config, session),
+        Commands::Load(ref session) => load_session(config, session),
     };
     if cli.verbose >= 2 {
         println!("{:#?}", s);
