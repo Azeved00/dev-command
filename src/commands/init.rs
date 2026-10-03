@@ -89,17 +89,19 @@ fn copy_template(template_name: &str, target: &Path) -> io::Result<()> {
             )
         })?;
 
-    for file in template_dir.files() {
-        let relative_path = file
-            .path()
-            .strip_prefix(template_dir.path())
-            .map_err(io::Error::other)?;
+    copy_dir_contents(template_dir, target)
+}
 
-        let output_path = target.join(relative_path);
+fn copy_dir_contents(dir: &Dir<'_>, target: &Path) -> io::Result<()> {
+    fs::create_dir_all(target)?;
 
-        if let Some(parent) = output_path.parent() {
-            fs::create_dir_all(parent)?;
-        }
+    for file in dir.files() {
+        let output_path = target.join(file.path().file_name().ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::InvalidData,
+                "embedded file has no file name",
+            )
+        })?);
 
         fs::write(&output_path, file.contents()).map_err(|error| {
             io::Error::new(
@@ -109,13 +111,17 @@ fn copy_template(template_name: &str, target: &Path) -> io::Result<()> {
         })?;
     }
 
-    for directory in template_dir.dirs() {
-        let relative_path = directory
-            .path()
-            .strip_prefix(template_dir.path())
-            .map_err(io::Error::other)?;
+    for subdir in dir.dirs() {
+        let directory_name = subdir.path().file_name().ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::InvalidData,
+                "embedded directory has no directory name",
+            )
+        })?;
 
-        fs::create_dir_all(target.join(relative_path))?;
+        let output_dir = target.join(directory_name);
+
+        copy_dir_contents(subdir, &output_dir)?;
     }
 
     Ok(())
