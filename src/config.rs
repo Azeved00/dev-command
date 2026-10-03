@@ -15,6 +15,10 @@ pub struct Window{
     pub nix_shell: String,
     #[serde(default = "default_nix_rename")]
     pub nix_rename: bool,
+    #[serde(default = "default_pane_count")]
+    pub pane_count: usize,
+    #[serde(default = "default_pane_layout")]
+    pub pane_layout: String,
 }
 
 
@@ -51,9 +55,11 @@ impl Config {
 pub fn default_windows() -> Vec<Window> { 
     vec![
         Window {
-            title: "".to_string(), 
-            nix_shell: "".to_string(),
-            nix_rename: false,
+            title: default_title(), 
+            nix_shell: default_nix_shell_name(),
+            nix_rename: default_nix_rename(),
+            pane_count: default_pane_count(),
+            pane_layout: default_pane_layout(),
         }
     ]
 }
@@ -62,3 +68,5 @@ fn default_nix_rename() -> bool { false }
 fn default_attach() -> bool { true }
 fn default_nix_shell_name() -> String { "".to_string() }
 fn default_git() -> bool {false}
+fn default_pane_count() -> usize {0}
+fn default_pane_layout() -> String { "tiled".to_string() }
