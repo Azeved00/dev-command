@@ -97,12 +97,6 @@ fn copy_template(template_name: &str, target: &Path) -> io::Result<()> {
 
         let output_path = target.join(relative_path);
 
-        println!(
-            "extracting {} -> {}",
-            file.path().display(),
-            output_path.display()
-        );
-
         if let Some(parent) = output_path.parent() {
             fs::create_dir_all(parent)?;
         }
@@ -113,6 +107,15 @@ fn copy_template(template_name: &str, target: &Path) -> io::Result<()> {
                 format!("failed to write {}: {error}", output_path.display()),
             )
         })?;
+    }
+
+    for directory in template_dir.dirs() {
+        let relative_path = directory
+            .path()
+            .strip_prefix(template_dir.path())
+            .map_err(io::Error::other)?;
+
+        fs::create_dir_all(target.join(relative_path))?;
     }
 
     Ok(())
