@@ -1,8 +1,9 @@
-use clap::Args;
 use std::path::{Path, PathBuf};
 use std::io;
 use std::fs;
 use std::env;
+use clap::Args;
+use include_dir::{include_dir, Dir};
 
 use crate::config::{
     Session,
@@ -13,6 +14,8 @@ use crate::commands::start::{
 };
 
 const DEFAULT_TEMPLATE: &str = "default";
+static TEMPLATES_DIR: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/templates");
+
 
 /// Create a new tmux session from a directory
 #[derive(Debug, Args)]
@@ -50,13 +53,10 @@ pub fn init_project (config: Config, command: &InitProject) ->  Session
             std::process::exit(1);
     });
 
-    let source = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("templates/")
-        .join(command.template.clone());
-
-    copy_dir_contents(&source, &command.directory)
-        .unwrap_or_else(|_| {
-            eprintln!("Failed to create project directory");
+    copy_template(&command.template, &command.directory)
+        .unwrap_or_else(|err| {
+            eprintln!("{}",err);
+            eprintln!("Failed to instantiate the template");
             std::process::exit(1);
     });
 
@@ -71,20 +71,19 @@ pub fn init_project (config: Config, command: &InitProject) ->  Session
     start_session(config, &start_command)
 }
 
-fn copy_dir_contents(src: &Path, target: &Path) -> io::Result<()> {
-    fs::create_dir_all(target)?;
+fn copy_template(template_name: &str, target: &Path) -> io::Result<()> {
+    let template_dir = TEMPLATES_DIR
+        .get_dir(template_name)
+        .ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::NotFound,
+                format!("template not found: {template_name}"),
+            )
+        })?;
 
-    for entry in fs::read_dir(src)? {
-        let entry = entry?;
-        let source_path = entry.path();
-        let target_path = target.join(entry.file_name());
-
-        if source_path.is_dir() {
-            copy_dir_contents(&source_path, &target_path)?;
-        } else {
-            fs::copy(&source_path, &target_path)?;
-        }
-    }
-
-    Ok(())
+    template_dir.extract(target).map_err(|error| {
+        io::Error::other(format!(
+            "failed to extract template {template_name}: {error}"
+        ))
+    })
 }
